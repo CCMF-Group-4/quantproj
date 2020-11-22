@@ -32,6 +32,22 @@ veggiecc_data <- veggiecc_data %>%
       mutate(gender = ifelse(gender == "Female",0,1))
 ** veggiecc_data <- veggiecc_data %>%
       mutate(IsVegetarian = ifelse(IsVegetarian == "No",0,1))
+      
+      
+ *************************************
+ veggiecc_data %>% group_by(Nationality) %>% summarise(n())
+
+veggiecc_data %>% group_by(reason_no_meat) %>% summarise(n())
+
+veggiecc_data %>% group_by(family_veg) %>% summarise(n())
+
+veggiecc_data %>% group_by(less_meat) %>% summarise(n())
+
+
+veggiecc_data %>% group_by(encouraged_others) %>% summarise(n())
+
+
+************************************************
 
 model_1 = glm(IsVegetarian ~ StudiesClimateChange , data = veggiecc_data, family = binomial(logit))
 summary(model_1)
