@@ -1,0 +1,194 @@
+---
+title: "quantproj"
+output: html_document
+---
+
+#LIBRARIES USED 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library (lmtest)
+library(pROC)
+library(car)
+
+```
+
+##INITALISING
+
+```{r init}
+
+setwd("C:\\Users\\Roger\\Desktop\\R\\Data")
+getwd()
+veggiecc_data = read.csv("Survey_Results_count.csv")
+
+
+veggiecc_data <- veggiecc_data %>%
+      mutate(less_meat = ifelse(less_meat == "No",0,1))
+veggiecc_data <- veggiecc_data %>%
+      mutate(family_veg = ifelse(family_veg == "No",0,1))
+veggiecc_data <- veggiecc_data %>%
+      mutate(uni_student = ifelse(uni_student == "No",0,1))
+veggiecc_data <- veggiecc_data %>%
+      mutate(reduced_carbon_footprint = ifelse(reduced_carbon_footprint == "No",0,1))
+veggiecc_data <- veggiecc_data %>%
+      mutate(encouraged_others = ifelse(encouraged_others == "No",0,1))
+
+IsVegetarian = veggiecc_data$IsVegetarian
+StudiesClimateChange = veggiecc_data$climate_change_course2
+less_meat = veggiecc_data$less_meat
+gender = veggiecc_data$Gender
+family_veg = veggiecc_data$family_veg
+age = veggiecc_data$Age
+nationality = veggiecc_data$Nationality
+uni_student = veggiecc_data$uni_student
+ReducedCarbonFootprint = veggiecc_data$reduced_carbon_footprint
+meat_freq = veggiecc_data$meat_frequency2
+encouraged_others = veggiecc_data$encouraged_others
+
+
+```
+#DATA
+
+```{r summarydata}
+
+
+veggiecc_data %>% group_by(Age) %>% summarise(n())
+veggiecc_data %>% group_by(Nationality) %>% summarise(n())
+veggiecc_data %>% group_by(family_veg) %>% summarise(n())
+veggiecc_data %>% group_by(less_meat) %>% summarise(n())
+veggiecc_data %>% group_by(encouraged_others) %>% summarise(n())
+
+
+```
+
+
+
+#REGRESSIONS OF OUR CATEGORICAL NON-BINARY VARIABLES
+
+```{r regrtry1}
+
+#Trying age
+
+model_0log = glm(IsVegetarian ~ age, data = veggiecc_data, family = binomial(logit))
+summary(model_0log)
+
+model_00log = glm(IsVegetarian ~ 0+ age, data = veggiecc_data, family = binomial(logit))
+summary(model_00log)
+
+```
+
+```{r regrtry2}
+
+#Trying our non binary variables
+
+model_000log = glm(IsVegetarian ~ nationality, data = veggiecc_data, family = binomial(logit))
+summary(model_0log)
+
+model_0000log = glm(IsVegetarian ~ 0+ nationality, data = veggiecc_data, family = binomial(logit))
+summary(model_00log)
+
+```
+
+#REGRESSION SELECTED
+
+```{r regr1}
+
+#This logistic regression permits to calculate the probability of being vegan if you are studying climate change
+
+model_1log = glm(IsVegetarian ~ StudiesClimateChange, data = veggiecc_data, family = binomial(logit))
+summary(model_1log)
+
+ggplot(data = veggiecc_data, aes(x = StudiesClimateChange, y = IsVegetarian)) +
+  geom_point(aes(color = as.factor(IsVegetarian)), shape = 1) + 
+  stat_function(fun = function(x){predict(model_1log,
+                                          newdata = data.frame(StudiesClimateChange = x),
+                                          type = "response")}) +
+  theme_bw() +
+  labs(title = "Logistic Regression",
+       y = "Is vegetarian?", x= "Studies Climate Change?") +
+  theme(legend.position = "none")
+
+#Plots to validate the residuals and all the requisites of a good regression
+plot(model_1log)
+
+```
+
+
+```{r regr1GOF}
+
+#Goodness of fits. We see that our model with the predictor StudiesClimateChange is significant compared to the NULL model.
+
+anova(model_1log, test ='Chisq')
+
+```
+
+
+```{r regrROC}
+
+#Plotting the ROC curve for assessing discriminating power of our model
+
+predpr <- predict(model_1log,type=c("response"))
+roccurve <- roc(IsVegetarian ~ predpr)
+auc(roccurve)
+plot(roccurve)
+
+
+```
+
+
+
+
+
+```{r regr2}
+
+#Same logistic regression but adding if is a uni student. ANOVA to test if this model improves the predicting capacity of the null model
+
+model_2log = glm(IsVegetarian ~ StudiesClimateChange + uni_student, data = veggiecc_data, family = binomial(logit))
+summary(model_2log)
+
+
+plot(model_2log)
+anova(model_2log, test ='Chisq')
+
+```
+
+```{r testcorr1}
+
+lrtest(model_2log, model_1log)
+
+#Compare the model with all the variables to a null one (only Beta-zero)
+
+lrtest(model_2log)
+
+
+```
+
+
+
+```{r testcorr2}
+
+mytable <- table(StudiesClimateChange, uni_student)
+print(mytable)
+chi2=chisq.test(mytable, correct=FALSE)
+print(chi2)
+phi=sqrt(chi2$statistic / sum(mytable))
+print(phi)
+
+#HERE WE SEE THAT THEY ARE HIGHLY CORRELATED.THIS IS LOGIC, BECAUSE ALMOST ALL THE "YES" OF StudiesClimateChange are a "YES" in uni_student. THEREFORE, WE SHOULD EXCLUDE THIS VARIABLE FROM OUR MODEL.
+
+```
+
+
+#REGRESSING OTHER THINGS
+
+```{r regr3lm}
+
+#This linear regression will try to see which variables affect the rate of consumption of meet per week. Also we test if there is multicolinearity 
+
+model_3 = lm( meat_freq ~ StudiesClimateChange + gender + ReducedCarbonFootprint  , data = veggiecc_data)
+summary(model_3)
+vif(model_3)
+
+```
